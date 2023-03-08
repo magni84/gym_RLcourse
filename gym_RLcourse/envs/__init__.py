@@ -1,0 +1,2 @@
+from gym_RLcourse.envs.bandits_env import MultiarmedBanditsEnv
+from gym_RLcourse.envs.gridworlds_env import GridWorldEnv
