@@ -6,6 +6,6 @@ Requirements: gymnasium and numpy
 
 ```
 git clone https://github.com/magni84/gym_RLcourse.git
-cd gym-RLcourse
+cd gym_RLcourse
 pip install -e .
 ```
