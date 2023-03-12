@@ -13,7 +13,26 @@ register(
 
 register(
     id='GridWorld-AB-v0', 
-    entry_point="gym_RLcourse.envs:GridWorldEnv",
+    entry_point="gym_RLcourse.envs:GridWorldABEnv",
     kwargs={"map_name": "Example 3.5"},   
     max_episode_steps=100
+)
+
+register(
+    id='GridWorld-Windy-v0', 
+    entry_point="gym_RLcourse.envs:GridWorldWindyEnv",
+    kwargs={"map_name": "Example 6.5"},   
+    max_episode_steps=10000
+)
+register(
+    id='GridWorld-WindyKing-v0', 
+    entry_point="gym_RLcourse.envs:GridWorldWindyEnv",
+    kwargs={"map_name": "Example 6.5", "nA": 8},   
+    max_episode_steps=10000
+)
+register(
+    id='GridWorld-Maze-v0', 
+    entry_point="gym_RLcourse.envs:GridWorldMazeEnv",
+    kwargs={"map_name": "Figure 8.2"},   
+    max_episode_steps=10000
 )

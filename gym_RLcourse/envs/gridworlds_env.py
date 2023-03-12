@@ -7,10 +7,14 @@ import numpy as np
 import gymnasium as gym
 import pygame
 
-LEFT = 0
-DOWN = 1
-RIGHT = 2
-UP = 3
+WEST = 0
+SOUTH = 1
+EAST = 2
+NORTH = 3
+NW = 4
+NE = 5
+SW = 6
+SE = 7
 
 MAPS = {
     "Example 4.1": [
@@ -34,26 +38,93 @@ MAPS = {
         "0001112210",
         "0001112210",
         "0001112210",
+    ],
+    "Figure 8.2": [
+        "0000000WG",
+        "00W0000W0",
+        "S0W0000W0",
+        "00W000000",
+        "00000W000",
+        "000000000",
+    ],
+    "Figure 8.4a": [
+        "00000000G",
+        "000000000",
+        "000000000",
+        "WWWWWWWW0",
+        "000000000",
+        "000S00000",
+    ],
+    "Figure 8.4b": [
+        "00000000G",
+        "000000000",
+        "000000000",
+        "0WWWWWWWW",
+        "000000000",
+        "000S00000",
+    ],
+    "Figure 8.5a": [
+        "00000000G",
+        "000000000",
+        "000000000",
+        "0WWWWWWWW",
+        "000000000",
+        "000S00000",
+    ],
+    "Figure 8.5b": [
+        "00000000G",
+        "000000000",
+        "000000000",
+        "0WWWWWWW0",
+        "000000000",
+        "000S00000",
     ]
 }
 
+
 class GridWorldEnv(gym.Env):
-    
+    """
+        Base environment for different GridWorlds that implement examples from
+        Reinforcement Learning: An Introduction by Sutton and Barto
+        http://incompleteideas.net/book/RLbook2020.pdf
+
+        Adapted from FrozenLake in Gymnasium:
+        https://github.com/Farama-Foundation/Gymnasium/blob/main/gymnasium/envs/toy_text/frozen_lake.py
+
+        MAPS:
+        The base class only do the rendering part, and specialized classes
+        computes transition probabilities.
+        The interpretation of symbols in the maps are
+
+        S - possible starting position
+        G - Goal states (show an "ice cream")
+        A, a, B, b - From A/B always jump to a/b (see GridWorldABEnv)
+        1,2 - Windy grids (see GridWorldWindyEnv)
+        W - A wall (shows a "fence")
+        Other - Show ground (grass)
+
+        TRANSITIONS:
+        The base class implements simple deterministic transitions, always
+        moving in the direction of the action, and stays if this takes it
+        out of bounds.
+        The reward is -1 for each step until reaching a goal state.
+    """
     metadata = {
         "render_modes": ["human", "ansi", "rgb_array"],
-                "render_fps": 4,
+        "render_fps": 4,
     }
 
     def __init__(
-            self, 
+            self,
             render_mode: Optional[str] = None,
-            map_name="Example 4.1"
+            map_name="Example 4.1",
+            nA = 4,
     ):
         self.desc = desc = np.asarray(MAPS[map_name], dtype="c")
         self.nrow, self.ncol = nrow, ncol = desc.shape
         self.reward_range = (-1, 0)
         self.map_name = map_name
-        self.nA = nA = 4
+        self.nA = nA
         self.nS = nS = nrow*ncol
 
         self.initial_state_distrib = np.array(desc == b"S").astype("float64").ravel()
@@ -62,84 +133,11 @@ class GridWorldEnv(gym.Env):
         self.observation_space = gym.spaces.Discrete(nS)
         self.action_space = gym.spaces.Discrete(nA)
 
+        self._calculate_transition_probs()
+
         self.render_mode = render_mode
 
-        self.P = {s: {a: [] for a in range(nA)} for s in range(nS)}
-        
-
-        def to_s(row, col):
-            return row*ncol + col
-
-        def inc(row, col, a):
-            if a == LEFT:
-                col = max(col - 1, 0)
-            elif a == DOWN:
-                row = min(row + 1, nrow - 1)
-            elif a == RIGHT:
-                col = min(col + 1, ncol - 1)
-            elif a == UP:
-                row = max(row - 1, 0)
-            return (row, col)
-
-        if b'A' in desc:
-            assert b'a' in desc, "Map with A but no a is not possible"
-            state_a = np.where(desc.ravel() == b'a')[0][0]
-        else:
-            state_a = None
-    
-        if b'B' in desc:
-            assert b'b' in desc, "Map with B but no b is not possible"
-            state_b = np.where(desc.ravel() == b'b')[0][0]
-        else:
-            state_b = None
-
-        if map_name == "Example 3.5":
-            step_reward = 0
-            outside_reward = -1
-        else:
-            step_reward = -1
-            outside_reward = -1
-        
-        for row in range(nrow):
-            for col in range(ncol):
-                s = to_s(row, col)
-
-                for a in range(4):
-                    li = self.P[s][a]
-                    letter = desc[row, col]
-
-                    if letter == b'G':
-                        li.append( (1.0, s, 0, True) )
-                    else:
-                        newrow, newcol = inc(row, col, a)
-                        newstate = to_s(newrow, newcol)
-                        newletter = desc[newrow, newcol]
-
-                        if letter == b'A':
-                            newstate = state_a
-                            reward = 10.0
-                        elif letter == b'B':
-                            newstate = state_b
-                            reward = 5.0
-                        elif newstate == s:
-                            reward = outside_reward
-                        else:
-                            reward = step_reward
-
-                        if letter == b'2':
-                            newrow = max(newrow-2, 0)
-                            newstate = to_s(newrow, newcol)
-                            newletter = desc[newrow, newcol]
-                        elif letter == b'1':
-                            newrow = max(newrow-1, 0)
-                            newstate = to_s(newrow, newcol)
-                            newletter = desc[newrow, newcol]
-
-                        terminated = bytes(newletter) in b"G"
-
-                        li.append( (1.0, newstate, reward, terminated) )
-
-
+        # For render_mode = "human"
         self.window_size = (min(64 * ncol, 512), min(64*nrow, 512))
         self.cell_size = (
             self.window_size[0] // self.ncol,
@@ -156,8 +154,60 @@ class GridWorldEnv(gym.Env):
         self.b = None
         self.smallwind = None
         self.largewind = None
+        self.wall = None
         self.lastaction = None
 
+    def _inc(self, row, col, a):
+        """Computes new row and col if we move according to action"""
+        if a == WEST:
+            col = max(col - 1, 0)
+        elif a == SOUTH:
+            row = min(row + 1, self.nrow - 1)
+        elif a == EAST:
+            col = min(col + 1, self.ncol - 1)
+        elif a == NORTH:
+            row = max(row - 1, 0)
+        elif a == NW:
+            row = max(row-1, 0)
+            col = max(col-1, 0)
+        elif a == NE:
+            row = max(row-1, 0)
+            col = min(col+1, self.ncol-1)
+        elif a == SW:
+            row = min(row+1, self.nrow-1)
+            col = max(col-1, 0)
+        elif a == SE:
+            row = min(row+1, self.nrow-1)
+            col = min(col+1, self.ncol-1)
+
+        return (row, col)
+
+    def _to_s(self, row, col):
+        """Convert row and column to state"""
+        return row*self.ncol + col
+
+    def _calculate_transition_probs(self): 
+
+        self.P = {s: {a: [] for a in range(self.nA)} for s in range(self.nS)}
+
+        for row in range(self.nrow):
+            for col in range(self.ncol):
+                s = self._to_s(row, col)
+
+                for a in range(self.nA):
+                    li = self.P[s][a]
+                    letter = self.desc[row][col]
+
+                    if letter == b'G':
+                        li.append((1.0, s, 0, True)) 
+                    else:
+                        newrow, newcol = self._inc(row, col, a)
+                        newstate = self._to_s(newrow, newcol)
+                        newletter = self.desc[newrow, newcol]
+
+                        terminated = bytes(newletter) in b"G"
+                        
+                        li.append((1.0, newstate, -1, terminated))
 
     def step(self, a):
         p, s, r, t = self.P[self.s][a][0]
@@ -184,7 +234,6 @@ class GridWorldEnv(gym.Env):
         if self.render_mode == "human":
             self.render()
 
-
         return int(self.s), {"prob": 1}
 
     def render(self):
@@ -210,14 +259,13 @@ class GridWorldEnv(gym.Env):
         desc = [[c.decode("utf-8") for c in line] for line in desc]
         desc[row][col] = utils.colorize(desc[row][col], "red", highlight=True)
         if self.lastaction is not None:
-            outfile.write(f"  ({['Left', 'Down', 'Right', 'Up'][self.lastaction]})\n")
+            outfile.write(f"  ({['West', 'South', 'East', 'North', 'North west', 'North east', 'South west', 'South east'][self.lastaction]})\n")
         else:
             outfile.write("\n")
         outfile.write("\n".join("".join(line) for line in desc) + "\n")
 
         with closing(outfile):
             return outfile.getvalue()
-
 
     def _render_gui(self, mode):
 
@@ -284,14 +332,17 @@ class GridWorldEnv(gym.Env):
             file = path.join(path.dirname(__file__), "img/largewind.png")
             self.largewind = pygame.transform.scale(
                 pygame.image.load(file), self.cell_size
+            ) 
+        if self.wall is None:
+            file = path.join(path.dirname(__file__), "img/fence.png")
+            self.wall = pygame.transform.scale(
+                pygame.image.load(file), self.cell_size
             )
-
-
 
         desc = self.desc.tolist()
         assert isinstance(desc, list), f"desc should be a list or an array, got {desc}"
 
-        self.window_surface.fill((0,0,0))
+        self.window_surface.fill((0, 0, 0))
 
         for y in range(self.nrow):
             for x in range(self.ncol):
@@ -314,6 +365,8 @@ class GridWorldEnv(gym.Env):
                     self.window_surface.blit(self.smallwind, pos)
                 if desc[y][x] == b"2":
                     self.window_surface.blit(self.largewind, pos)
+                if desc[y][x] == b"W":
+                    self.window_surface.blit(self.wall, pos)
 
                 pygame.draw.rect(self.window_surface, (180, 200, 230), rect, 1)
 
@@ -337,6 +390,172 @@ class GridWorldEnv(gym.Env):
         if self.window_surface is not None:
             pygame.display.quit()
             pygame.quit()
+
+
+class GridWorldABEnv(GridWorldEnv):
+    """Implements Example 3.5 in Sutton an Barto. 
+
+    TRANSITIONS:
+    Moves deterministically the direction of the action except when in A or B
+    in which case the state teleports to a and b respectively. 
+
+    Reward 0 for each step, -1 for going out of bounds, +10 leaving A and +5 leaving B. 
+    """
+    def __init__(
+        self, 
+        render_mode: Optional[str] = None,
+        map_name="Example 3.5",
+        nA = 4
+    ):
+        super().__init__(render_mode, map_name, nA)
+
+    def _calculate_transition_probs(self): 
+        if b'A' in self.desc:
+            assert b'a' in self.desc, "Map with A but no a is not possible"
+            state_a = np.where(self.desc.ravel() == b'a')[0][0]
+        else:
+            state_a = None
+    
+        if b'B' in self.desc:
+            assert b'b' in self.desc, "Map with B but no b is not possible"
+            state_b = np.where(self.desc.ravel() == b'b')[0][0]
+        else:
+            state_b = None
+
+        self.P = {s: {a: [] for a in range(self.nA)} for s in range(self.nS)}
+
+        for row in range(self.nrow):
+            for col in range(self.ncol):
+                s = self._to_s(row, col)
+
+                for a in range(self.nA):
+                    li = self.P[s][a]
+                    letter = self.desc[row][col]
+
+                    if letter == b'G':
+                        li.append((1.0, s, 0, True)) 
+                    else:
+                        newrow, newcol = self._inc(row, col, a)
+                        newstate = self._to_s(newrow, newcol)
+                        newletter = self.desc[newrow, newcol]
+
+                        if letter == b'A':
+                            newstate = state_a
+                            reward = 10
+                        elif letter == b'B':
+                            newstate = state_b
+                            reward = 5
+                        elif newstate == s:
+                            reward = -1
+                        else:
+                            reward = 0
+
+                        terminated = bytes(newletter) in b"G"
+                        
+                        li.append((1.0, newstate, reward, terminated))
+
+
+class GridWorldWindyEnv(GridWorldEnv):
+    """Implements Example 6.5 in Sutton an Barto. 
+
+    TRANSITIONS:
+    Moves deterministically the direction of the action. If it is a windy state (1 or 2) 
+    will move up corresponding number of steps. 
+
+    Reward -1 for each step unless goal is reached.
+    """
+    def __init__(
+        self, 
+        render_mode: Optional[str] = None,
+        map_name="Example 6.5",
+        nA = 4
+    ):
+        super().__init__(render_mode, map_name, nA)
+
+    def _calculate_transition_probs(self): 
+
+        self.P = {s: {a: [] for a in range(self.nA)} for s in range(self.nS)}
+
+        for row in range(self.nrow):
+            for col in range(self.ncol):
+                s = self._to_s(row, col)
+
+                for a in range(self.nA):
+                    li = self.P[s][a]
+                    letter = self.desc[row][col]
+
+                    if letter == b'G':
+                        li.append((1.0, s, 0, True)) 
+                    else:
+                        newrow, newcol = self._inc(row, col, a)
+                        newstate = self._to_s(newrow, newcol)
+                        newletter = self.desc[newrow, newcol]
+
+                        if letter == b'2':
+                            newrow = max(newrow-2, 0)
+                            newstate = self._to_s(newrow, newcol)
+                            newletter = self.desc[newrow, newcol]
+                        elif letter == b'1':
+                            newrow = max(newrow-1, 0)
+                            newstate = self._to_s(newrow, newcol)
+                            newletter = self.desc[newrow, newcol]
+
+                        terminated = bytes(newletter) in b"G"
+                        
+                        li.append((1.0, newstate, -1, terminated))
+
+
+class GridWorldMazeEnv(GridWorldEnv):
+    """Implements mazed from Chapter 8 in Sutton an Barto. 
+
+    TRANSITIONS:
+    Move deterministically according to action, but stay if moving into 
+    fence or out of bounds. 
+
+    Reward is 0 for all transistions except if the goal state is reached in 
+    which case the reward is 1. 
+    """
+    def __init__(
+        self, 
+        render_mode: Optional[str] = None,
+        map_name="Figure 8.2",
+        nA = 4
+    ):
+        super().__init__(render_mode, map_name, nA)
+
+    def _calculate_transition_probs(self): 
+
+        self.P = {s: {a: [] for a in range(self.nA)} for s in range(self.nS)}
+
+        for row in range(self.nrow):
+            for col in range(self.ncol):
+                s = self._to_s(row, col)
+
+                for a in range(self.nA):
+                    li = self.P[s][a]
+                    letter = self.desc[row][col]
+
+                    if letter == b'G':
+                        li.append((1.0, s, 0, True)) 
+                    else:
+                        newrow, newcol = self._inc(row, col, a)
+                        newstate = self._to_s(newrow, newcol)
+                        newletter = self.desc[newrow, newcol]
+
+                        if newletter == b'W':
+                            newstate = s
+                            newletter = letter
+
+                        if newletter == b"G":
+                            reward = 1
+                            terminated = True
+                        else:
+                            reward = 0
+                            terminated = False
+                        
+                        li.append((1.0, newstate, reward, terminated))
+
+
 
 
 
