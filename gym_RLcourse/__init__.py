@@ -36,3 +36,16 @@ register(
     kwargs={"map_name": "Figure 8.2"},   
     max_episode_steps=10000
 )
+
+register(id='Corridor-v0',
+         entry_point='gym_RLcourse.envs:CorridorEnv',
+)
+
+register(id='ShortCorridor-v0',
+         entry_point='gym_RLcourse.envs:ShortCorridorEnv',
+)
+
+register(id='DynaMaze-v0',
+         entry_point='gym_RLcourse.envs:DynaMazeEnv',
+         kwargs={'maze_type' : 'DM'},
+)
