@@ -2,7 +2,7 @@ import setuptools
 from setuptools import setup
 
 setup(name='gym_RLcourse',
-      version='0.0.2',
+      version='0.0.3',
       author='Per Mattsson',
       author_email='magni84@gmail.com',
       description='Some environments used in the RL course at Uppsala University',

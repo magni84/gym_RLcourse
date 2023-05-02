@@ -78,6 +78,9 @@ MAPS = {
         "0WWWWWWW0",
         "000000000",
         "000S00000",
+    ], 
+    "Example 13.1": [
+        "SR0G"
     ]
 }
 
@@ -118,7 +121,7 @@ class GridWorldEnv(gym.Env):
             self,
             render_mode: Optional[str] = None,
             map_name="Example 4.1",
-            nA = 4,
+            nA = 4
     ):
         self.desc = desc = np.asarray(MAPS[map_name], dtype="c")
         self.nrow, self.ncol = nrow, ncol = desc.shape
@@ -152,6 +155,7 @@ class GridWorldEnv(gym.Env):
         self.a = None
         self.B = None
         self.b = None
+        self.R = None
         self.smallwind = None
         self.largewind = None
         self.wall = None
@@ -338,6 +342,11 @@ class GridWorldEnv(gym.Env):
             self.wall = pygame.transform.scale(
                 pygame.image.load(file), self.cell_size
             )
+        if self.R is None:
+            file = path.join(path.dirname(__file__), "img/R.png")
+            self.R = pygame.transform.scale(
+                pygame.image.load(file), self.cell_size
+            )
 
         desc = self.desc.tolist()
         assert isinstance(desc, list), f"desc should be a list or an array, got {desc}"
@@ -367,6 +376,8 @@ class GridWorldEnv(gym.Env):
                     self.window_surface.blit(self.largewind, pos)
                 if desc[y][x] == b"W":
                     self.window_surface.blit(self.wall, pos)
+                if desc[y][x] == b"R":
+                    self.window_surface.blit(self.R, pos)
 
                 pygame.draw.rect(self.window_surface, (180, 200, 230), rect, 1)
 
@@ -390,6 +401,55 @@ class GridWorldEnv(gym.Env):
         if self.window_surface is not None:
             pygame.display.quit()
             pygame.quit()
+
+class GridWorldCorridorEnv(GridWorldEnv):
+    """Implements Example 13.1 in Sutton and Barto."""
+
+    def __init__(
+        self,
+        render_mode: Optional[str] = None, 
+        map_name="Example 13.1",
+        nA = 2
+    ):
+        super().__init__(render_mode, map_name, 2)
+
+    def _calculate_transition_probs(self): 
+
+        LEFT = 0
+        RIGHT = 1
+
+        self.P = {s: {a: [] for a in range(self.nA)} for s in range(self.nS)}
+
+        for s in range(self.ncol):
+            row = 0
+
+            for a in range(self.nA):
+                li = self.P[s][a]
+                letter = self.desc[row][s]
+
+                if letter == b'R':
+                    if a == LEFT:
+                        a = RIGHT
+                    else:
+                        a = LEFT
+
+                if letter == b'G':
+                    li.append((1.0, s, 0, True)) 
+                else:
+                    if a == LEFT:
+                        newstate = max(s-1, 0)
+                    else:
+                        newstate = min(s+1, self.ncol-1)
+
+                    newletter = self.desc[row, newstate]
+
+                    if newletter == b"G":
+                        terminated = True 
+                        reward = 1
+                    terminated = bytes(newletter) in b"G"
+                    
+                    li.append((1.0, newstate, -1, terminated))
+        
 
 
 class GridWorldABEnv(GridWorldEnv):

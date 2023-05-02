@@ -42,7 +42,8 @@ register(id='Corridor-v0',
 )
 
 register(id='ShortCorridor-v0',
-         entry_point='gym_RLcourse.envs:ShortCorridorEnv',
+         entry_point='gym_RLcourse.envs:GridWorldCorridorEnv',
+         max_episode_steps=1000
 )
 
 register(id='DynaMaze-v0',
