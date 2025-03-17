@@ -7,7 +7,7 @@ Requirements: gymnasium and numpy
 ```
 git clone https://github.com/magni84/gym_RLcourse.git
 cd gym_RLcourse
-pip install -e .
+pip install .
 ```
 # Attribution 
 The code for `GridWorldEnv` is based on the [FrozenLake](https://github.com/Farama-Foundation/Gymnasium/blob/main/gymnasium/envs/toy_text/frozen_lake.py) environment licensed under an MIT license.  
